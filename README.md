@@ -1,4 +1,4 @@
-# Rupiah Bill Splitter Frontend
+# Split-It! Frontend
 
 Static frontend for GitHub Pages.
 

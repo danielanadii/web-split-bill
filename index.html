@@ -3,15 +3,64 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Rupiah Bill OCR</title>
-    <link rel="stylesheet" href="./styles.css">
+    <title>Split-It!</title>
+    <link rel="stylesheet" href="./styles.css?v=split-it-landing-back">
   </head>
   <body>
-    <main class="app-shell" id="appShell" data-step="upload">
+    <main class="app-shell" id="appShell" data-step="landing">
+      <section class="landing-panel" id="landingPanel">
+        <div class="brand-lockup">
+          <span class="brand-mark">Rp</span>
+          <div>
+            <h1>Split-It!</h1>
+            <p>Splitting bills has never been this easy.</p>
+          </div>
+        </div>
+
+        <div class="landing-demo" aria-hidden="true">
+          <div class="demo-receipt">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="demo-total">
+            <strong>Rp8.824</strong>
+            <small>split 3 ways</small>
+          </div>
+        </div>
+
+        <div class="how-it-works" aria-label="How to use Split-It">
+          <article>
+            <b>1</b>
+            <div>
+              <strong>Upload a bill</strong>
+              <p>Take a screenshot or photo of the receipt.</p>
+            </div>
+          </article>
+          <article>
+            <b>2</b>
+            <div>
+              <strong>Review the items</strong>
+              <p>Check OCR results, fees, discounts, and totals.</p>
+            </div>
+          </article>
+          <article>
+            <b>3</b>
+            <div>
+              <strong>Assign and share</strong>
+              <p>Choose who ate what and send the final split.</p>
+            </div>
+          </article>
+        </div>
+
+        <button class="primary-button landing-start" type="button" id="startSplitButton">Start splitting</button>
+        <p class="landing-watermark">© 2026 Daniel Anadi B.</p>
+      </section>
+
       <header class="topbar">
         <div class="nav-row">
           <button class="ghost-button hidden" type="button" id="topBackButton" aria-label="Back">‹</button>
-          <strong id="pageTitle">Create new split bill</strong>
+          <strong id="pageTitle">Split-It!</strong>
           <span id="stepCount">1/5</span>
         </div>
         <div class="step-track" aria-label="Bill split progress">
@@ -21,10 +70,6 @@
           <span class="step-dot" data-step-dot="assign"></span>
           <span class="step-dot" data-step-dot="summary"></span>
         </div>
-        <div class="upload-intro" id="uploadIntro">
-          <h1>Create new split bill</h1>
-          <p id="stepSubtitle">Upload your bill image</p>
-        </div>
       </header>
 
       <section class="upload-panel" id="uploadPanel">
@@ -32,7 +77,7 @@
           <input id="billImage" type="file" accept="image/*">
           <span class="upload-glyph">⌁</span>
           <span class="drop-title">Upload bill image</span>
-          <span class="drop-caption">JPG, PNG, GoFood, delivery orders, or printed receipts</span>
+          <span class="drop-caption">GoFood, ShopeeFood, delivery orders, or printed receipts</span>
         </label>
       </section>
 
@@ -171,8 +216,8 @@
       <aside class="toast hidden" id="toast"></aside>
     </main>
 
-    <script src="./config.js"></script>
+    <script src="./config.js?v=split-it-landing-back"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="./app.js"></script>
+    <script src="./app.js?v=split-it-landing-back"></script>
   </body>
 </html>

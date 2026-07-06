@@ -14,17 +14,17 @@ const config = window.BILL_SPLITTER_CONFIG || {};
 const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/$/, "");
 const isDevMode = Boolean(config.devMode);
 const ocrLoadingMessages = [
-  "Uploading receipt to the OCR backend...",
-  "Waking the OCR service if it was idle...",
-  "Preparing the image for text detection...",
-  "PaddleOCR is reading item rows and prices...",
-  "Rebuilding receipt lines from detected text boxes...",
-  "Parsing Rupiah items, tax, service, and totals..."
+  "Working our magic...",
+  "Reading every item carefully...",
+  "Finding prices and quantities...",
+  "Putting everything in the right place...",
+  "Almost there! Checking the total..."
 ];
 
 const byId = (id) => document.getElementById(id);
 
 const dom = {
+  landingPanel: byId("landingPanel"),
   uploadPanel: byId("uploadPanel"),
   actionBar: byId("actionBar"),
   previewPanel: byId("previewPanel"),
@@ -36,8 +36,6 @@ const dom = {
   appShell: byId("appShell"),
   pageTitle: byId("pageTitle"),
   stepCount: byId("stepCount"),
-  stepSubtitle: byId("stepSubtitle"),
-  uploadIntro: byId("uploadIntro"),
   topBackButton: byId("topBackButton"),
   billImage: byId("billImage"),
   imagePreview: byId("imagePreview"),
@@ -109,14 +107,8 @@ function stopOcrLoadingMessages() {
 }
 
 function setStepChrome(step) {
-  const subtitles = {
-    upload: "Upload your bill image",
-    bill: "Check every item and total",
-    people: "Add everyone on this bill",
-    assign: "Choose who shares each item",
-    summary: "Review who pays what"
-  };
   const titles = {
+    landing: "Split-It!",
     upload: "Create new split bill",
     bill: "Bill edit",
     people: "Choose people",
@@ -128,10 +120,8 @@ function setStepChrome(step) {
   dom.appShell.dataset.step = step;
   dom.appShell.dataset.devMode = String(isDevMode);
   dom.pageTitle.textContent = titles[step] || titles.upload;
-  dom.stepCount.textContent = `${Math.max(stepIndex + 1, 1)}/${order.length}`;
-  dom.stepSubtitle.textContent = subtitles[step] || subtitles.upload;
-  setVisible(dom.uploadIntro, step === "upload");
-  setVisible(dom.topBackButton, step !== "upload");
+  dom.stepCount.textContent = step === "landing" ? "" : `${Math.max(stepIndex + 1, 1)}/${order.length}`;
+  setVisible(dom.topBackButton, step !== "landing");
   document.querySelectorAll("[data-step-dot]").forEach((dot) => {
     const dotIndex = order.indexOf(dot.dataset.stepDot);
     dot.classList.toggle("active", dotIndex === stepIndex);
@@ -196,6 +186,7 @@ function renderBill(bill) {
 
 function showStep(step) {
   setStepChrome(step);
+  setVisible(dom.landingPanel, step === "landing");
   setVisible(dom.uploadPanel, step === "upload");
   setVisible(dom.previewPanel, step === "upload" && Boolean(dom.imagePreview.getAttribute("src")));
   setVisible(dom.billPanel, step === "bill");
@@ -457,11 +448,18 @@ async function createSummaryImageFile() {
   const split = latestSplit.length ? latestSplit : computeSplitSummary();
   const scale = 2;
   const width = 900;
-  const lineHeight = 44;
   const headerHeight = 190;
-  const rowHeight = 76;
+  const personHeaderHeight = 70;
+  const detailLineHeight = 32;
+  const personGap = 24;
   const footerHeight = 120;
-  const height = headerHeight + split.length * rowHeight + footerHeight;
+  const personHeights = split.map((person) => {
+    const itemLines = Math.max(person.items.length, 1);
+    const feeLines = currentBill.totalFee ? 1 : 0;
+    const discountLines = currentBill.totalDiscount ? 1 : 0;
+    return personHeaderHeight + (itemLines + feeLines + discountLines) * detailLineHeight + personGap;
+  });
+  const height = headerHeight + personHeights.reduce((sum, value) => sum + value, 0) + footerHeight;
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
   canvas.height = height * scale;
@@ -485,7 +483,7 @@ async function createSummaryImageFile() {
   context.fillText(formatRupiah(currentBill.totalPayment), 72, 178);
 
   let y = 220;
-  split.forEach((person) => {
+  split.forEach((person, personIndex) => {
     context.fillStyle = getPersonColor(person.index);
     context.beginPath();
     context.arc(94, y + 22, 22, 0, Math.PI * 2);
@@ -499,9 +497,6 @@ async function createSummaryImageFile() {
     context.fillStyle = "#111111";
     context.font = "750 25px Inter, system-ui, sans-serif";
     context.fillText(person.name, 130, y + 18);
-    context.fillStyle = "#6f7480";
-    context.font = "500 18px Inter, system-ui, sans-serif";
-    context.fillText(`${person.items.length} item${person.items.length === 1 ? "" : "s"}`, 130, y + 48);
 
     context.fillStyle = "#111111";
     context.font = "800 26px Inter, system-ui, sans-serif";
@@ -509,22 +504,69 @@ async function createSummaryImageFile() {
     context.fillText(formatRupiah(person.total), width - 72, y + 31);
     context.textAlign = "left";
 
+    let detailY = y + 64;
+    context.font = "500 19px Inter, system-ui, sans-serif";
+    const detailItems = person.items.length ? person.items : [{ name: "No assigned items", quantity: 0, subtotal: 0 }];
+    detailItems.forEach((item) => {
+      drawShareDetailLine(
+        context,
+        `${formatQuantity(item.quantity)}x ${item.name}`,
+        formatRupiah(item.subtotal),
+        130,
+        width - 72,
+        detailY
+      );
+      detailY += detailLineHeight;
+    });
+
+    if (currentBill.totalFee) {
+      drawShareDetailLine(context, "Fee share", formatRupiah(person.fee), 130, width - 72, detailY);
+      detailY += detailLineHeight;
+    }
+
+    if (currentBill.totalDiscount) {
+      drawShareDetailLine(context, "Discount share", `-${formatRupiah(person.discount)}`, 130, width - 72, detailY);
+      detailY += detailLineHeight;
+    }
+
     context.strokeStyle = "#ececf0";
     context.lineWidth = 1;
     context.beginPath();
-    context.moveTo(72, y + 66);
-    context.lineTo(width - 72, y + 66);
+    context.moveTo(72, detailY + 14);
+    context.lineTo(width - 72, detailY + 14);
     context.stroke();
-    y += rowHeight;
+    y += personHeights[personIndex];
   });
 
   context.fillStyle = "#6f7480";
   context.font = "500 18px Inter, system-ui, sans-serif";
-  context.fillText("Generated by Rupiah Bill Splitter", 72, height - 64);
+  context.fillText("Generated by Split-It!", 72, height - 64);
 
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 0.95));
   if (!blob) throw new Error("Could not create summary image");
   return new File([blob], "split-bill-summary.png", { type: "image/png" });
+}
+
+function drawShareDetailLine(context, label, value, leftX, rightX, y) {
+  context.fillStyle = "#6f7480";
+  context.font = "500 19px Inter, system-ui, sans-serif";
+  context.textAlign = "left";
+  const maxLabelWidth = rightX - leftX - 170;
+  context.fillText(truncateCanvasText(context, label, maxLabelWidth), leftX, y);
+  context.fillStyle = "#111111";
+  context.textAlign = "right";
+  context.fillText(value, rightX, y);
+  context.textAlign = "left";
+}
+
+function truncateCanvasText(context, text, maxWidth) {
+  const value = String(text);
+  if (context.measureText(value).width <= maxWidth) return value;
+  let trimmed = value;
+  while (trimmed.length > 1 && context.measureText(`${trimmed}...`).width > maxWidth) {
+    trimmed = trimmed.slice(0, -1);
+  }
+  return `${trimmed.trim()}...`;
 }
 
 function roundRect(context, x, y, width, height, radius) {
@@ -844,7 +886,7 @@ async function detectFromImage(file) {
 async function detectWithPaddleOcr(file) {
   const formData = new FormData();
   formData.append("file", file);
-  dom.loadingDetail.textContent = "Sending image to PaddleOCR...";
+  dom.loadingDetail.textContent = "Uploading your receipt...";
 
   try {
     const response = await fetch(`${apiBaseUrl}/api/ocr`, {
@@ -930,6 +972,10 @@ dom.billImage.addEventListener("change", () => {
   setVisible(dom.previewPanel, true);
 });
 
+byId("startSplitButton").addEventListener("click", () => {
+  showStep("upload");
+});
+
 dom.detectButton.addEventListener("click", async () => {
   const file = dom.billImage.files[0];
   if (!file) {
@@ -982,7 +1028,9 @@ byId("parseRawButton").addEventListener("click", () => {
 
 dom.topBackButton.addEventListener("click", () => {
   const step = dom.appShell.dataset.step;
-  if (step === "bill") {
+  if (step === "upload") {
+    showStep("landing");
+  } else if (step === "bill") {
     showStep("upload");
   } else if (step === "people") {
     renderBill(currentBill);
@@ -1105,3 +1153,5 @@ byId("startOverButton").addEventListener("click", () => {
   setVisible(dom.previewPanel, false);
   showStep("upload");
 });
+
+showStep("landing");
