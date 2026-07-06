@@ -2,6 +2,7 @@ let currentBill = makeEmptyBill();
 let people = ["Person 1", "Person 2", "Person 3"];
 let assignments = {};
 let latestSplit = [];
+let ocrLoadingTimer = null;
 
 const rupiahFormatter = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -11,6 +12,14 @@ const rupiahFormatter = new Intl.NumberFormat("id-ID", {
 
 const config = window.BILL_SPLITTER_CONFIG || {};
 const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/$/, "");
+const ocrLoadingMessages = [
+  "Uploading receipt to the OCR backend...",
+  "Waking the OCR service if it was idle...",
+  "Preparing the image for text detection...",
+  "PaddleOCR is reading item rows and prices...",
+  "Rebuilding receipt lines from detected text boxes...",
+  "Parsing Rupiah items, tax, service, and totals..."
+];
 
 const byId = (id) => document.getElementById(id);
 
@@ -77,6 +86,21 @@ function showToast(message) {
   dom.toast.textContent = message;
   setVisible(dom.toast, true);
   window.setTimeout(() => setVisible(dom.toast, false), 2200);
+}
+
+function startOcrLoadingMessages() {
+  let messageIndex = 0;
+  dom.loadingDetail.textContent = ocrLoadingMessages[messageIndex];
+  window.clearInterval(ocrLoadingTimer);
+  ocrLoadingTimer = window.setInterval(() => {
+    messageIndex = (messageIndex + 1) % ocrLoadingMessages.length;
+    dom.loadingDetail.textContent = ocrLoadingMessages[messageIndex];
+  }, 2300);
+}
+
+function stopOcrLoadingMessages() {
+  window.clearInterval(ocrLoadingTimer);
+  ocrLoadingTimer = null;
 }
 
 function setStepChrome(step) {
@@ -396,13 +420,13 @@ function parseBillText(rawText) {
     .filter(Boolean);
 
   const bill = makeEmptyBill(cleanedText);
-  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan/i.test(line));
+  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan|kdrt/i.test(line));
   bill.billTitle = titleLine ? cleanTitle(titleLine) : "Digitalized bill";
 
   for (const line of lines) {
     const lower = line.toLowerCase();
 
-    if (/(total price|subtotal pesanan|subtotal order)/i.test(line)) {
+    if (/(total price|subtotal pesanan|subtotal order|\bsubtotal\b)/i.test(line)) {
       bill.totalPrice = extractLastAmount(line);
       continue;
     }
@@ -412,7 +436,7 @@ function parseBillText(rawText) {
       continue;
     }
 
-    if (/(total payment|total paid|non tunai|purchase)/i.test(line)) {
+    if (/(total payment|total paid|non tunai|purchase|paid\s*online|paidonline|qris)/i.test(line)) {
       bill.totalPayment = extractLastAmount(line);
       continue;
     }
@@ -493,6 +517,7 @@ function cleanTitle(line) {
   if (/gofood/i.test(line)) return "GoFood bill";
   if (/rincian/i.test(line)) return "Rincian Pesanan";
   if (/tiut/i.test(line)) return "TIUT Receipt";
+  if (/kdrt/i.test(line)) return "KDRT The Barn";
   return line.slice(0, 48);
 }
 
@@ -519,7 +544,7 @@ function extractContextAmount(line) {
 }
 
 function isFeeLine(line) {
-  if (!/(fee|biaya|pengiriman|layanan|pengemasan|handling|handing)/i.test(line)) {
+  if (!/(fee|biaya|pengiriman|layanan|pengemasan|handling|handing|\btax\b|\btex\b|service charge)/i.test(line)) {
     return false;
   }
 
@@ -584,6 +609,18 @@ function parseItemLine(line) {
     };
   }
 
+  const noQuantityPattern = /^(.+?)\s+rp\s*([\d.,]+)$/i;
+  const noQuantityMatch = dedupedLine.match(noQuantityPattern);
+  if (noQuantityMatch && !/(subtotal|total|paid|qris|tax|tex|service|fee|discount|voucher|order|tanggal|date|time|no\.?)/i.test(dedupedLine)) {
+    const subtotal = parseCurrency(noQuantityMatch[2]);
+    return {
+      name: cleanItemName(noQuantityMatch[1].trim()),
+      quantity: 1,
+      unitPrice: subtotal,
+      subtotal
+    };
+  }
+
   const receiptPattern = /^(.+?)\s+(\d+)\s+([\d.,]{4,})\s+([\d.,]{4,})$/;
   const receiptMatch = dedupedLine.match(receiptPattern);
   if (receiptMatch) {
@@ -602,6 +639,7 @@ function parseItemLine(line) {
 function cleanItemName(name) {
   return name
     .replace(/[^\w\s/.'&#+-]/g, "")
+    .replace(/([A-Za-z])(\d+\s*Pcs\b)/gi, "$1 $2")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\bBakmi special GM\b/i, "Bakmi Special GM")
@@ -748,6 +786,7 @@ dom.detectButton.addEventListener("click", async () => {
   setVisible(dom.billPanel, false);
 
   try {
+    startOcrLoadingMessages();
     const bill = await detectFromImage(file);
     renderBill(bill);
     showStep("bill");
@@ -756,6 +795,7 @@ dom.detectButton.addEventListener("click", async () => {
     console.error(error);
     showToast("OCR failed. You can still paste OCR text and parse it.");
   } finally {
+    stopOcrLoadingMessages();
     setVisible(dom.loadingPanel, false);
   }
 });
