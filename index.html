@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rupiah Bill OCR</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell" id="appShell" data-step="upload">
+      <header class="topbar">
+        <div class="step-track" aria-label="Bill split progress">
+          <span class="step-dot active" data-step-dot="upload"></span>
+          <span class="step-dot" data-step-dot="bill"></span>
+          <span class="step-dot" data-step-dot="people"></span>
+          <span class="step-dot" data-step-dot="assign"></span>
+          <span class="step-dot" data-step-dot="summary"></span>
+        </div>
+        <div>
+          <h1>Create new split bill</h1>
+          <p id="stepSubtitle">Upload your bill image</p>
+        </div>
+      </header>
+
+      <section class="upload-panel" id="uploadPanel">
+        <label class="drop-zone" for="billImage">
+          <input id="billImage" type="file" accept="image/*">
+          <span class="upload-glyph">⌁</span>
+          <span class="drop-title">Upload bill image</span>
+          <span class="drop-caption">JPG, PNG, GoFood, delivery orders, or printed receipts</span>
+        </label>
+      </section>
+
+      <section class="preview-panel hidden" id="previewPanel">
+        <img id="imagePreview" alt="Uploaded bill preview">
+        <div>
+          <p class="status" id="ocrStatus">Ready</p>
+          <p class="status-caption">Review the image, then detect the bill.</p>
+          <button class="primary-button" type="button" id="detectButton">Detect bill</button>
+        </div>
+      </section>
+
+      <section class="loading hidden" id="loadingPanel" aria-live="polite">
+        <div class="spinner"></div>
+        <div>
+          <strong id="loadingTitle">Reading bill</strong>
+          <span id="loadingDetail">Detecting text and totals...</span>
+        </div>
+      </section>
+
+      <section class="bill-card hidden" id="billPanel">
+        <div class="bill-header">
+          <label>
+            <span>Bill title</span>
+            <input id="billTitle" type="text">
+          </label>
+          <p id="billMeta">Detected draft</p>
+        </div>
+
+        <div class="section-heading">
+          <h2>Items</h2>
+          <button class="text-button" type="button" id="addItemButton">Add item</button>
+        </div>
+
+        <div class="items-list" id="itemsList"></div>
+
+        <div class="summary-grid">
+          <label>
+            <span>Total items</span>
+            <input id="totalPrice" type="text" inputmode="numeric">
+          </label>
+          <label>
+            <span>Total fee</span>
+            <input id="totalFee" type="text" inputmode="numeric">
+          </label>
+          <label>
+            <span>Total discount</span>
+            <input id="totalDiscount" type="text" inputmode="numeric">
+          </label>
+          <label class="payment-field">
+            <span>Total payment</span>
+            <input id="totalPayment" type="text" inputmode="numeric">
+          </label>
+        </div>
+
+        <details class="raw-block">
+          <summary>OCR text</summary>
+          <textarea id="rawText" rows="9"></textarea>
+          <button class="secondary-button" type="button" id="parseRawButton">Parse edited text</button>
+        </details>
+
+      </section>
+
+      <section class="wizard-panel hidden" id="peoplePanel">
+        <div class="panel-heading">
+          <button class="ghost-button" type="button" id="backToBillButton" aria-label="Back">‹</button>
+          <h2>Choose people</h2>
+          <span>3/5</span>
+        </div>
+
+        <label>
+          <span>How many people?</span>
+          <input id="peopleCount" type="number" min="2" max="20" value="3">
+        </label>
+
+        <div class="people-list" id="peopleList"></div>
+
+      </section>
+
+      <section class="wizard-panel hidden" id="assignPanel">
+        <div class="panel-heading">
+          <button class="ghost-button" type="button" id="backToPeopleButton" aria-label="Back">‹</button>
+          <h2>Assign items</h2>
+          <span>4/5</span>
+        </div>
+
+        <div class="section-heading assignment-heading">
+          <h2>Assign items</h2>
+          <p>Select who shares each item</p>
+        </div>
+
+        <div class="assignment-list" id="assignmentList"></div>
+
+      </section>
+
+      <section class="wizard-panel hidden" id="summaryPanel">
+        <div class="panel-heading">
+          <button class="ghost-button" type="button" id="backToAssignButton" aria-label="Back">‹</button>
+          <h2>Bill Split Summary</h2>
+          <span>5/5</span>
+        </div>
+
+        <div class="summary-title">
+          <h2 id="summaryBillTitle">Bill summary</h2>
+          <p id="summaryBillMeta"></p>
+        </div>
+
+        <div class="split-list" id="splitList"></div>
+
+        <div class="summary-total">
+          <span>Total payment</span>
+          <strong id="summaryGrandTotal">Rp0</strong>
+        </div>
+
+      </section>
+
+      <footer class="action-bar hidden" id="actionBar">
+        <button class="secondary-button" type="button" id="recalculateButton" data-action-step="bill">Recalculate</button>
+        <button class="primary-button" type="button" id="continueToPeopleButton" data-action-step="bill">Continue</button>
+        <button class="primary-button" type="button" id="continueToAssignButton" data-action-step="people">Continue</button>
+        <button class="secondary-button" type="button" id="equalSplitButton" data-action-step="assign">Equal split</button>
+        <button class="primary-button" type="button" id="showSummaryButton" data-action-step="assign">Summary</button>
+        <button class="secondary-button" type="button" id="copyJsonButton" data-action-step="summary">Copy JSON</button>
+        <button class="primary-button" type="button" id="startOverButton" data-action-step="summary">New bill</button>
+      </footer>
+
+      <aside class="toast hidden" id="toast"></aside>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
