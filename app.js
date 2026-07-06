@@ -33,7 +33,11 @@ const dom = {
   assignPanel: byId("assignPanel"),
   summaryPanel: byId("summaryPanel"),
   appShell: byId("appShell"),
+  pageTitle: byId("pageTitle"),
+  stepCount: byId("stepCount"),
   stepSubtitle: byId("stepSubtitle"),
+  uploadIntro: byId("uploadIntro"),
+  topBackButton: byId("topBackButton"),
   billImage: byId("billImage"),
   imagePreview: byId("imagePreview"),
   detectButton: byId("detectButton"),
@@ -111,12 +115,23 @@ function setStepChrome(step) {
     assign: "Choose who shares each item",
     summary: "Review who pays what"
   };
+  const titles = {
+    upload: "Create new split bill",
+    bill: "Bill edit",
+    people: "Choose people",
+    assign: "Assign items",
+    summary: "Bill Split Summary"
+  };
+  const order = ["upload", "bill", "people", "assign", "summary"];
+  const stepIndex = order.indexOf(step);
   dom.appShell.dataset.step = step;
+  dom.pageTitle.textContent = titles[step] || titles.upload;
+  dom.stepCount.textContent = `${Math.max(stepIndex + 1, 1)}/${order.length}`;
   dom.stepSubtitle.textContent = subtitles[step] || subtitles.upload;
+  setVisible(dom.uploadIntro, step === "upload");
+  setVisible(dom.topBackButton, step !== "upload");
   document.querySelectorAll("[data-step-dot]").forEach((dot) => {
-    const order = ["upload", "bill", "people", "assign", "summary"];
     const dotIndex = order.indexOf(dot.dataset.stepDot);
-    const stepIndex = order.indexOf(step);
     dot.classList.toggle("active", dotIndex === stepIndex);
     dot.classList.toggle("complete", dotIndex < stepIndex);
   });
@@ -823,6 +838,22 @@ byId("addItemButton").addEventListener("click", () => {
 byId("parseRawButton").addEventListener("click", () => {
   renderBill(parseBillText(dom.rawText.value));
   showToast("OCR text parsed again.");
+});
+
+dom.topBackButton.addEventListener("click", () => {
+  const step = dom.appShell.dataset.step;
+  if (step === "bill") {
+    showStep("upload");
+  } else if (step === "people") {
+    renderBill(currentBill);
+    showStep("bill");
+  } else if (step === "assign") {
+    renderPeopleSetup();
+    showStep("people");
+  } else if (step === "summary") {
+    renderAssignments();
+    showStep("assign");
+  }
 });
 
 byId("recalculateButton").addEventListener("click", () => {

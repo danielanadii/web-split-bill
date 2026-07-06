@@ -9,6 +9,11 @@
   <body>
     <main class="app-shell" id="appShell" data-step="upload">
       <header class="topbar">
+        <div class="nav-row">
+          <button class="ghost-button hidden" type="button" id="topBackButton" aria-label="Back">‹</button>
+          <strong id="pageTitle">Create new split bill</strong>
+          <span id="stepCount">1/5</span>
+        </div>
         <div class="step-track" aria-label="Bill split progress">
           <span class="step-dot active" data-step-dot="upload"></span>
           <span class="step-dot" data-step-dot="bill"></span>
@@ -16,7 +21,7 @@
           <span class="step-dot" data-step-dot="assign"></span>
           <span class="step-dot" data-step-dot="summary"></span>
         </div>
-        <div>
+        <div class="upload-intro" id="uploadIntro">
           <h1>Create new split bill</h1>
           <p id="stepSubtitle">Upload your bill image</p>
         </div>
@@ -93,7 +98,7 @@
 
       <section class="wizard-panel hidden" id="peoplePanel">
         <div class="panel-heading">
-          <button class="ghost-button" type="button" id="backToBillButton" aria-label="Back">‹</button>
+          <button class="ghost-button panel-back-button" type="button" id="backToBillButton" aria-label="Back">‹</button>
           <h2>Choose people</h2>
           <span>3/5</span>
         </div>
@@ -109,7 +114,7 @@
 
       <section class="wizard-panel hidden" id="assignPanel">
         <div class="panel-heading">
-          <button class="ghost-button" type="button" id="backToPeopleButton" aria-label="Back">‹</button>
+          <button class="ghost-button panel-back-button" type="button" id="backToPeopleButton" aria-label="Back">‹</button>
           <h2>Assign items</h2>
           <span>4/5</span>
         </div>
@@ -125,7 +130,7 @@
 
       <section class="wizard-panel hidden" id="summaryPanel">
         <div class="panel-heading">
-          <button class="ghost-button" type="button" id="backToAssignButton" aria-label="Back">‹</button>
+          <button class="ghost-button panel-back-button" type="button" id="backToAssignButton" aria-label="Back">‹</button>
           <h2>Bill Split Summary</h2>
           <span>5/5</span>
         </div>

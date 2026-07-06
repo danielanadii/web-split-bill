@@ -44,7 +44,7 @@ button {
   width: min(100%, 430px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: 28px 20px 0;
+  padding: 0 20px 0;
   background: var(--paper);
   box-shadow: var(--shadow-strong);
   overflow-x: hidden;
@@ -55,10 +55,10 @@ button {
 
 .topbar {
   display: grid;
-  place-items: center;
-  gap: 14px;
-  min-height: 84px;
-  padding: 8px 0 24px;
+  align-items: center;
+  gap: 12px;
+  min-height: 80px;
+  padding: calc(16px + env(safe-area-inset-top)) 0 16px;
   position: sticky;
   top: 0;
   z-index: 8;
@@ -66,11 +66,35 @@ button {
   backdrop-filter: blur(16px);
 }
 
+.nav-row {
+  display: grid;
+  grid-template-columns: 42px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.nav-row strong {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.nav-row > span {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
 .step-track {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  width: min(168px, 48vw);
+  gap: 8px;
+  width: 100%;
 }
 
 .step-dot {
@@ -109,6 +133,13 @@ h1 {
   font-weight: 700;
   line-height: 1.2;
   text-align: center;
+}
+
+.upload-intro {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 0 4px;
 }
 
 .topbar p {
@@ -304,14 +335,14 @@ h2 {
 }
 
 .bill-card {
-  margin-top: 18px;
+  margin-top: 12px;
   padding: 0;
   border: 0;
   box-shadow: none;
 }
 
 .wizard-panel {
-  margin-top: 18px;
+  margin-top: 12px;
   padding: 0;
   animation: pageIn 280ms ease both;
 }
@@ -321,7 +352,7 @@ h2 {
 }
 
 .panel-heading {
-  display: grid;
+  display: none;
   grid-template-columns: 42px 1fr 42px;
   align-items: center;
   gap: 8px;
@@ -465,12 +496,17 @@ textarea:focus {
 
 .assignment-heading {
   align-items: end;
-  margin-top: 22px;
+  margin-top: 2px;
+}
+
+.assignment-heading h2 {
+  display: none;
 }
 
 .assignment-heading p {
   color: var(--muted);
   font-size: 12px;
+  margin-left: auto;
 }
 
 .assignment-row,
@@ -727,6 +763,12 @@ textarea:focus {
 
 .hidden {
   display: none;
+}
+
+.nav-row .ghost-button.hidden {
+  display: block;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 @keyframes riseIn {
