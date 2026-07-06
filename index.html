@@ -103,10 +103,18 @@
           <span>3/5</span>
         </div>
 
-        <label>
+        <div class="people-count-control">
           <span>How many people?</span>
-          <input id="peopleCount" type="number" min="2" max="20" value="3">
-        </label>
+          <div class="people-options" role="group" aria-label="Choose people count">
+            <button class="people-preset" type="button" data-people-preset="2">2</button>
+            <button class="people-preset" type="button" data-people-preset="3">3</button>
+            <button class="people-preset" type="button" data-people-preset="4">4</button>
+            <label class="custom-count">
+              <span class="sr-only">Custom people count</span>
+              <input id="peopleCount" type="number" min="2" max="20" value="3" placeholder="Custom" aria-label="Custom people count">
+            </label>
+          </div>
+        </div>
 
         <div class="people-list" id="peopleList"></div>
 

@@ -275,6 +275,7 @@ function initializeAssignments() {
 
 function renderPeopleSetup() {
   dom.peopleCount.value = people.length;
+  updatePeopleCountControls();
   dom.peopleList.innerHTML = "";
   people.forEach((name, index) => {
     const row = document.createElement("label");
@@ -296,6 +297,12 @@ function setPeopleCount(count) {
   people = nextPeople;
   initializeAssignments();
   renderPeopleSetup();
+}
+
+function updatePeopleCountControls() {
+  document.querySelectorAll("[data-people-preset]").forEach((button) => {
+    button.classList.toggle("selected", Number(button.dataset.peoplePreset) === people.length);
+  });
 }
 
 function renderAssignments() {
@@ -874,6 +881,12 @@ byId("backToBillButton").addEventListener("click", () => {
 
 dom.peopleCount.addEventListener("input", () => {
   setPeopleCount(dom.peopleCount.value);
+});
+
+document.querySelectorAll("[data-people-preset]").forEach((button) => {
+  button.addEventListener("click", () => {
+    setPeopleCount(button.dataset.peoplePreset);
+  });
 });
 
 dom.peopleList.addEventListener("input", (event) => {
