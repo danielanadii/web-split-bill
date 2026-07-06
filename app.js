@@ -9,6 +9,9 @@ const rupiahFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 0
 });
 
+const config = window.BILL_SPLITTER_CONFIG || {};
+const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/$/, "");
+
 const byId = (id) => document.getElementById(id);
 
 const dom = {
@@ -529,6 +532,7 @@ function isFeeLine(line) {
 
 function parseItemLine(line) {
   const normalizedLine = normalizeOcrText(line)
+    .replace(/\b(\d+)\s*x(?=[A-Za-z#])/g, "$1 x ")
     .replace(/\s+/g, " ")
     .replace(/\s+@/g, " @")
     .trim();
@@ -636,6 +640,44 @@ async function preprocessImageForOcr(file) {
 }
 
 async function detectFromImage(file) {
+  const paddleBill = await detectWithPaddleOcr(file);
+  if (paddleBill) return paddleBill;
+
+  return detectWithBrowserOcr(file);
+}
+
+async function detectWithPaddleOcr(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  dom.loadingDetail.textContent = "Sending image to PaddleOCR...";
+
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/ocr`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) {
+      throw new Error(`PaddleOCR returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    if (!payload.rawText) {
+      throw new Error("PaddleOCR returned no text");
+    }
+
+    dom.loadingDetail.textContent = `PaddleOCR found ${payload.lineCount || 0} text lines.`;
+    const bill = parseBillText(payload.rawText);
+    bill.rawText = payload.rawText;
+    return bill;
+  } catch (error) {
+    console.warn("PaddleOCR unavailable, falling back to browser OCR.", error);
+    dom.loadingDetail.textContent = "PaddleOCR unavailable, using browser OCR...";
+    return null;
+  }
+}
+
+async function detectWithBrowserOcr(file) {
   const tesseract = window.Tesseract;
   if (!tesseract) {
     showToast("OCR library is offline. Please try again when the OCR script is available.");
