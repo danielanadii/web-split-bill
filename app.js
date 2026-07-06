@@ -533,6 +533,7 @@ function isFeeLine(line) {
 function parseItemLine(line) {
   const normalizedLine = normalizeOcrText(line)
     .replace(/\b(\d+)\s*x(?=[A-Za-z#])/g, "$1 x ")
+    .replace(/^(\d+)(?=[A-Za-z#])/, "$1 ")
     .replace(/\s+/g, " ")
     .replace(/\s+@/g, " @")
     .trim();
@@ -604,6 +605,7 @@ function cleanItemName(name) {
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\bBakmi special GM\b/i, "Bakmi Special GM")
+    .replace(/\bNasiGoreng SmokedChicken\b/i, "Nasi Goreng Smoked Chicken")
     .replace(/\bNasi Goreng Smoked Chicken\b/i, "Nasi Goreng Smoked Chicken")
     .replace(/\bPangsit Goreng\b/i, "Pangsit Goreng")
     .replace(/\bSTRIPSILS\b/i, "STRIPSILS");
