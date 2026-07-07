@@ -617,7 +617,8 @@ function parseBillText(rawText) {
     .filter(Boolean));
 
   const bill = makeEmptyBill(cleanedText);
-  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan|kdrt|solaria/i.test(line));
+  const solariaItems = extractSolariaItems(lines);
+  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan|kdrt|solaria|laria/i.test(line));
   bill.billTitle = titleLine ? cleanTitle(titleLine) : "Digitalized bill";
 
   for (const line of lines) {
@@ -654,16 +655,28 @@ function parseBillText(rawText) {
       continue;
     }
 
-    const item = parseItemLine(line);
+    const item = solariaItems.length ? null : parseItemLine(line);
     if (item && !/(ppn|dpp|harga jual|qr|id poinku|cek poin)/i.test(lower)) {
       bill.items.push(item);
+    }
+  }
+
+  if (solariaItems.length) {
+    bill.items = solariaItems;
+    const finalPayment = extractSolariaFinalPayment(lines, solariaItems.reduce((sum, item) => sum + item.subtotal, 0));
+    if (finalPayment) {
+      bill.totalPayment = finalPayment;
     }
   }
 
   if (bill.items.length) {
     // OCR totals are often noisy, so the detected items are the source of truth.
     bill.totalPrice = bill.items.reduce((sum, item) => sum + item.subtotal, 0);
-    bill.totalPayment = bill.totalPrice + bill.totalFee - bill.totalDiscount;
+    if (solariaItems.length && bill.totalPayment) {
+      bill.totalFee = bill.totalPayment - bill.totalPrice + bill.totalDiscount;
+    } else {
+      bill.totalPayment = bill.totalPrice + bill.totalFee - bill.totalDiscount;
+    }
   } else {
     if (!bill.totalPrice) {
       bill.totalPrice = 0;
@@ -675,6 +688,93 @@ function parseBillText(rawText) {
   }
 
   return normalizeBill(bill);
+}
+
+function extractSolariaItems(lines) {
+  if (!lines.some((line) => /solaria|laria/i.test(line))) return [];
+
+  const itemLines = [];
+  let insideItems = false;
+  for (const line of lines) {
+    if (/no customer/i.test(line)) {
+      insideItems = true;
+      continue;
+    }
+
+    if (!insideItems && /dine in/i.test(line)) {
+      insideItems = true;
+    }
+
+    if (!insideItems) continue;
+    itemLines.push(line);
+    if (/^items?\b/i.test(line)) break;
+  }
+
+  if (!itemLines.length) return [];
+
+  const amountPattern = /\d{1,3}(?:[.,]\d{3})+\b|\b\d{4,}\b/g;
+  const names = [];
+  const quantities = [];
+  const amounts = [];
+
+  for (const line of itemLines) {
+    const lineAmounts = line.match(amountPattern) || [];
+    lineAmounts.forEach((amount) => amounts.push(parseCurrency(amount)));
+
+    if (/^items?\b/i.test(line)) continue;
+
+    const withoutAmounts = line.replace(amountPattern, " ");
+    const quantityMatches = [...withoutAmounts.matchAll(/(?:^|\s)(\d{1,2})(?=\s|$)/g)];
+    quantityMatches.forEach((match) => quantities.push(Number(match[1])));
+
+    const name = withoutAmounts
+      .replace(/\bdine in\b/gi, " ")
+      .replace(/(?:^|\s)\d{1,2}(?=\s|$)/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (!name || /(date|receipt|cashier|customer|items?|total|rounding|qris|bca|terima)/i.test(name)) {
+      continue;
+    }
+
+    const previousIndex = names.length - 1;
+    if (previousIndex >= 0 && (names[previousIndex].endsWith("/") || /^porsi\b/i.test(name))) {
+      names[previousIndex] = `${names[previousIndex]} ${name}`.replace(/\s+/g, " ").trim();
+    } else {
+      names.push(name);
+    }
+  }
+
+  const itemCount = Math.min(names.length, quantities.length, amounts.length);
+  if (itemCount < 3) return [];
+
+  return Array.from({ length: itemCount }, (_, index) => {
+    const quantity = quantities[index] || 1;
+    const subtotal = amounts[index] || 0;
+    return {
+      name: cleanItemName(names[index]),
+      quantity,
+      unitPrice: Math.round(subtotal / quantity),
+      subtotal
+    };
+  });
+}
+
+function extractSolariaFinalPayment(lines, totalPrice) {
+  let seenPaymentArea = false;
+  const candidates = [];
+  for (const line of lines) {
+    if (/^total\b|bca|qris/i.test(line)) {
+      seenPaymentArea = true;
+    }
+
+    if (!seenPaymentArea) continue;
+    const amount = extractLastAmount(line);
+    if (amount >= totalPrice) {
+      candidates.push(amount);
+    }
+  }
+  return candidates.at(-1) || 0;
 }
 
 function mergeReceiptContinuationLines(lines) {
@@ -736,7 +836,7 @@ function cleanTitle(line) {
   if (/rincian/i.test(line)) return "Rincian Pesanan";
   if (/tiut/i.test(line)) return "TIUT Receipt";
   if (/kdrt/i.test(line)) return "KDRT The Barn";
-  if (/solaria/i.test(line)) return "Solaria bill";
+  if (/solaria|laria/i.test(line)) return "Solaria bill";
   return line.slice(0, 48);
 }
 
