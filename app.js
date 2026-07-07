@@ -611,13 +611,13 @@ async function shareSummary() {
 
 function parseBillText(rawText) {
   const cleanedText = normalizeOcrText(rawText);
-  const lines = cleanedText
+  const lines = mergeReceiptContinuationLines(cleanedText
     .split(/\n+/)
     .map((line) => line.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
+    .filter(Boolean));
 
   const bill = makeEmptyBill(cleanedText);
-  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan|kdrt/i.test(line));
+  const titleLine = lines.find((line) => /gofood|rincian|tiut|receipt|pesanan|kdrt|solaria/i.test(line));
   bill.billTitle = titleLine ? cleanTitle(titleLine) : "Digitalized bill";
 
   for (const line of lines) {
@@ -633,7 +633,7 @@ function parseBillText(rawText) {
       continue;
     }
 
-    if (/(total payment|total paid|non tunai|purchase|paid\s*online|paidonline|qris)/i.test(line)) {
+    if (/(total payment|total paid|non tunai|purchase|paid\s*online|paidonline|qris|^total\b)/i.test(line)) {
       bill.totalPayment = extractLastAmount(line);
       continue;
     }
@@ -649,7 +649,8 @@ function parseBillText(rawText) {
     }
 
     if (isFeeLine(line)) {
-      bill.totalFee += Math.abs(extractContextAmount(line));
+      const feeAmount = extractContextAmount(line);
+      bill.totalFee += /rounding/i.test(line) && !/before/i.test(line) ? feeAmount : Math.abs(feeAmount);
       continue;
     }
 
@@ -674,6 +675,26 @@ function parseBillText(rawText) {
   }
 
   return normalizeBill(bill);
+}
+
+function mergeReceiptContinuationLines(lines) {
+  const merged = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const nextLine = lines[index + 1] || "";
+    const looksLikeWrappedItemName = /[A-Za-z]$|\/$/i.test(line)
+      && !/(date|receipt|cashier|customer|dine in|items?|terima|restaurant|solaria|total|subtotal|before rounding|rounding|qris|bca)/i.test(line)
+      && /^.+?\s+\d+\s+[\d.,]{4,}$/.test(nextLine)
+      && !/(total|subtotal|rounding|qris|bca|items?)/i.test(nextLine);
+
+    if (looksLikeWrappedItemName) {
+      merged.push(`${line} ${nextLine}`);
+      index += 1;
+    } else {
+      merged.push(line);
+    }
+  }
+  return merged;
 }
 
 function normalizeOcrText(rawText) {
@@ -715,6 +736,7 @@ function cleanTitle(line) {
   if (/rincian/i.test(line)) return "Rincian Pesanan";
   if (/tiut/i.test(line)) return "TIUT Receipt";
   if (/kdrt/i.test(line)) return "KDRT The Barn";
+  if (/solaria/i.test(line)) return "Solaria bill";
   return line.slice(0, 48);
 }
 
@@ -741,8 +763,16 @@ function extractContextAmount(line) {
 }
 
 function isFeeLine(line) {
-  if (!/(fee|biaya|pengiriman|layanan|pengemasan|handling|handing|\btax\b|\btex\b|service charge)/i.test(line)) {
+  if (!/(fee|biaya|pengiriman|layanan|pengemasan|handling|handing|\btax\b|\btex\b|service charge|\bppn\b|\bpb[l1i]\s*10%|rounding)/i.test(line)) {
     return false;
+  }
+
+  if (/before rounding/i.test(line)) {
+    return false;
+  }
+
+  if (/rounding/i.test(line) && !/before/i.test(line)) {
+    return /-?\d+/.test(line);
   }
 
   if (!/(?:rp\s*)?\d[\d.,]{2,}/i.test(line)) {
@@ -827,6 +857,19 @@ function parseItemLine(line) {
       quantity,
       unitPrice: parseCurrency(receiptMatch[3]),
       subtotal: parseCurrency(receiptMatch[4])
+    };
+  }
+
+  const compactReceiptPattern = /^(.+?)\s+(\d+)\s+([\d.,]{4,})$/;
+  const compactReceiptMatch = dedupedLine.match(compactReceiptPattern);
+  if (compactReceiptMatch && !/(items?|date|receipt|customer|cashier|total|subtotal|rounding|qris|bca|before)/i.test(dedupedLine)) {
+    const quantity = Number(compactReceiptMatch[2]);
+    const subtotal = parseCurrency(compactReceiptMatch[3]);
+    return {
+      name: cleanItemName(compactReceiptMatch[1].trim()),
+      quantity,
+      unitPrice: Math.round(subtotal / quantity),
+      subtotal
     };
   }
 
