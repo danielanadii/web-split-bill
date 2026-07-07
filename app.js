@@ -13,6 +13,7 @@ const rupiahFormatter = new Intl.NumberFormat("id-ID", {
 const config = window.BILL_SPLITTER_CONFIG || {};
 const apiBaseUrl = String(config.apiBaseUrl || "").replace(/\/$/, "");
 const isDevMode = Boolean(config.devMode);
+const shareImageScale = 2;
 const ocrLoadingMessages = [
   "Working our magic...",
   "Reading every item carefully...",
@@ -446,7 +447,7 @@ function getShareText() {
 
 async function createSummaryImageFile() {
   const split = latestSplit.length ? latestSplit : computeSplitSummary();
-  const scale = 2;
+  const scale = shareImageScale;
   const width = 900;
   const headerHeight = 190;
   const personHeaderHeight = 70;
